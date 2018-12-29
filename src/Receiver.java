@@ -18,6 +18,7 @@ public class Receiver extends Thread {
         this.group = group;
         this.port = port;
         this.start();
+
     }
 
     public void run() {
@@ -27,13 +28,18 @@ public class Receiver extends Thread {
         while (true) {
             try {
                 ds = new DatagramSocket();
-
                 System.out.println("File Request:");
                 filename = scanner.nextLine();
                 finalMessage = new String("p2p -receive " + filename);
                 byte[] f = finalMessage.getBytes();
                 DatagramPacket messageOut = new DatagramPacket(f, f.length, group, port);
                 ds.send(messageOut);
+                try {
+                    ds.setSoTimeout(3000);
+                } catch (SocketException e) {
+                    continue;
+                }
+
             } catch (IOException e) {
                 e.printStackTrace();
             }

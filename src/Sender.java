@@ -61,7 +61,7 @@ public class Sender extends Thread {
                     String path = contains(filename2);
                     System.out.println(path);
                     if (path == null) {
-                        System.out.println("I don't have this file");
+                        System.out.println("I don't have the file");
                         continue;
                     }
                     File peerFile = new File(path);
