@@ -12,9 +12,11 @@ public class Sender extends Thread {
     private int sizeOfPacket = 65000;
     private Vector<String> fileList = new Vector<>();
     private boolean isSender = false;
+    private String id;
 
-    public Sender(int port, String path) {
+    public Sender(int port, String path, String id) {
         this.port = port;
+        this.id = id;
         fileList.add(path);
         while (true) {
             System.out.println("Type end in order to finish assigning files ");
@@ -31,6 +33,7 @@ public class Sender extends Thread {
         System.out.println("ready to share files");
 
         while (true) {
+            boolean iSend = false;
             try {
                 socket = new MulticastSocket(port);
                 socket.joinGroup(InetAddress.getByName("230.0.0.0"));
@@ -60,22 +63,37 @@ public class Sender extends Thread {
                     String filename2 = fileReq.split(" ")[2];
                     String path = contains(filename2);
                     System.out.println(path);
-                    if (path == null) {
+                    if (path != null) {
+                        String responseID = id;
+                        DatagramPacket pkt = new DatagramPacket(responseID.getBytes(), responseID.getBytes().length, ip, secondPort);
+                        ds.send(pkt);
+                        System.out.println("ID has been sent");
+                    } else if (path == null) {
                         System.out.println("I don't have the file");
                         continue;
                     }
-                    File peerFile = new File(path);
-                    mybytearray = new byte[(int) peerFile.length()];
-                    FileInputStream fis = new FileInputStream(peerFile);
-                    BufferedInputStream bis = new BufferedInputStream(fis);
-                    DataInputStream dis = new DataInputStream(bis);
-                    dis.readFully(mybytearray, 0, mybytearray.length);
-                    System.out.println("size of byteArray " + mybytearray.length);
-                    int fileSize = mybytearray.length;
-                    String fileInfo = String.valueOf(fileSize) + " " + String.valueOf(sizeOfPacket);
-                    DatagramPacket pkt = new DatagramPacket(fileInfo.getBytes(), fileInfo.getBytes().length, ip, secondPort);
-                    ds.send(pkt);
-                    new FileTransportHandler(ip, secondPort, mybytearray, sizeOfPacket);
+                    byte[] ack = new byte[65536];
+                    DatagramPacket response = new DatagramPacket(ack, ack.length);
+                    ds.setSoTimeout(3000);
+                    ds.receive(response);
+                    String str = new String(response.getData(), 0, response.getLength());
+                    if (str.equals("You send")) {
+                        System.out.println("Yesssssssss");
+                        File peerFile = new File(path);
+                        mybytearray = new byte[(int) peerFile.length()];
+                        FileInputStream fis = new FileInputStream(peerFile);
+                        BufferedInputStream bis = new BufferedInputStream(fis);
+                        DataInputStream dis = new DataInputStream(bis);
+                        dis.readFully(mybytearray, 0, mybytearray.length);
+                        System.out.println("size of byteArray " + mybytearray.length);
+                        int fileSize = mybytearray.length;
+                        String fileInfo = String.valueOf(fileSize) + " " + String.valueOf(sizeOfPacket) + " " + id;
+                        DatagramPacket pkt = new DatagramPacket(fileInfo.getBytes(), fileInfo.getBytes().length, ip, secondPort);
+                        ds.send(pkt);
+                        new FileTransportHandler(ip, secondPort, mybytearray, sizeOfPacket);
+                    }else {
+                        continue;
+                    }
                 }
             } catch (SocketException e) {
                 System.out.println("Socket:" + e.getMessage());

@@ -4,30 +4,37 @@ import java.util.*;
 
 public class Receiver extends Thread {
     private DatagramSocket ds = null;
+    private DatagramSocket ackSock = null;
     InetAddress group;
-    int port;
+    private int port;
     private Scanner scanner;
     Vector<Byte> file;
     private int receivingFileSize;
     private int packetSize;
     private int numOfPackets;
     Vector<byte[]> vec;
+    private String id;
 
-    public Receiver(InetAddress group, int port) {
+    public Receiver(InetAddress group, int port, String id) {
         file = new Vector<>();
         this.group = group;
         this.port = port;
+        this.id = id;
         this.start();
 
     }
 
     public void run() {
         String filename = "";
-        String finalMessage;
+        String finalMessage = null;
+        InetAddress senderIP;
         scanner = new Scanner(System.in);
+        ArrayList<String> senderID = new ArrayList<>();
         while (true) {
             try {
                 ds = new DatagramSocket();
+                ackSock = new DatagramSocket();
+
                 System.out.println("File Request:");
                 filename = scanner.nextLine();
                 finalMessage = new String("p2p -receive " + filename);
@@ -50,18 +57,37 @@ public class Receiver extends Thread {
             }
             System.out.println("the request has been sent");
             try {
+                byte[] ack = new byte[65536];
+                DatagramPacket response = new DatagramPacket(ack, ack.length);
+                System.out.println("come here");
+                ds.receive(response);
+                int senderPort = response.getPort();
+                senderIP = response.getAddress();
+                System.out.println(senderIP + " " + senderPort);
+                String order = new String("You send");
+                byte[] arr = order.getBytes();
+                DatagramPacket messageOut = new DatagramPacket(arr, arr.length, senderIP, senderPort);
+                ds.send(messageOut);
+                System.out.println("I sent");
                 byte[] buf2 = new byte[65535];
                 DatagramPacket message = new DatagramPacket(buf2, buf2.length);
                 System.out.println("here before receiving packet");
-                ds.receive(message);
-                System.out.println("here after receiving packet");
-                String fileInfo = new String(message.getData(), 0, message.getLength());
-                System.out.println(fileInfo.split(" ")[0]);
+                String fileInfo;
+                while (true) {
+                    ds.receive(message);
+                    System.out.println("here after receiving packet");
+                    fileInfo = new String(message.getData(), 0, message.getLength());
+                    if (fileInfo.split(" ").length == 3) {
+                        break;
+                    }
+                }
+                //System.out.println(fileInfo.split(" ")[0]);
+                System.out.println("info is " + fileInfo);
                 receivingFileSize = Integer.parseInt(fileInfo.split(" ")[0]);
                 packetSize = Integer.parseInt(fileInfo.split(" ")[1]);
                 numOfPackets = 1 + (receivingFileSize / (packetSize - 4));
 
-                System.out.println("info is " + fileInfo);
+
                 System.out.println(numOfPackets);
             } catch (SocketException ex) {
                 System.out.println("Socket:" + ex.getMessage());
@@ -113,10 +139,6 @@ public class Receiver extends Thread {
     }
 
     private void concat(byte[] fileSegment) {
-//        for (int i = 0; i < fileSegment.length; i++) {
-//            System.out.println(fileSegment[i]);
-//        }
-
         byte[] res = new byte[fileSegment.length - 4];
         for (int i = 4; i < fileSegment.length; i++) {
             res[i - 4] = fileSegment[i];
